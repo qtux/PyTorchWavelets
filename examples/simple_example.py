@@ -17,6 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import torch
 from wavelets_pytorch.transform import WaveletTransform        # SciPy version
 from wavelets_pytorch.transform import WaveletTransformTorch   # PyTorch version
 
@@ -30,7 +31,6 @@ We compare both the SciPy implementation and the PyTorch implementation.
 dt = 0.1               # sampling frequency
 dj = 0.125             # scale distribution parameter
 batch_size = 32        # how many signals to process in parallel
-cuda = True            # enable GPU
 
 t = np.linspace(0., 10., int(10./dt))
 
@@ -43,7 +43,7 @@ for wavelet in [Morlet(), Ricker()]:
 
     # Initialize wavelet filter banks (scipy and torch implementation)
     wa_scipy = WaveletTransform(dt, dj, wavelet)
-    wa_torch = WaveletTransformTorch(dt, dj, wavelet, cuda=cuda)
+    wa_torch = WaveletTransformTorch(dt, dj, wavelet, cuda=torch.cuda.is_available())
 
     # Performing wavelet transform (and compute scalogram)
     cwt_scipy = wa_scipy.cwt(batch)

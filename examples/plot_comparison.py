@@ -17,6 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 
 from wavelets_pytorch.wavelets import Morlet, Ricker, DOG
@@ -49,7 +50,7 @@ batch += np.random.normal(0, 0.2, batch.shape)  # Gaussian noise
 # Performing wavelet transform
 
 wa = WaveletTransform(dt, dj, wavelet, unbias=unbias)
-wa_torch = WaveletTransformTorch(dt, dj, wavelet, unbias=unbias, cuda=True)
+wa_torch = WaveletTransformTorch(dt, dj, wavelet, unbias=unbias, cuda=torch.cuda.is_available())
 
 power = wa.power(batch)
 power_torch = wa_torch.power(batch)
