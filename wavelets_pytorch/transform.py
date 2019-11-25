@@ -24,7 +24,6 @@ import scipy.signal
 import scipy.optimize
 
 import torch
-from torch.autograd import Variable
 
 from wavelets_pytorch.wavelets import Morlet
 from wavelets_pytorch.network import TorchFilterBank
@@ -174,10 +173,6 @@ class WaveletTransformBase(object):
     @property
     def dj(self):
         return self._dj
-
-    @property
-    def wavelet(self):
-        return self._wavelet
 
     @property
     def unbias(self):
