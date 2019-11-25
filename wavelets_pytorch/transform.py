@@ -319,6 +319,30 @@ class WaveletTransformTorch(WaveletTransformBase):
             cwt = cwt.squeeze(0)
         return cwt
 
+    def power(self, x):
+        """
+        Performs CWT and converts to a power spectrum (scalogram).
+        See Torrence & Combo, Section 4d.
+        :param x: torch tensor, batch of input signals of shape [n_batch,1,signal_length]
+        :return: torch tensor, scalogram for each signal [n_batch,n_scales,signal_length]
+        """
+        signal_length = x.shape[-1]
+        if signal_length != self.signal_length or not self._filters:
+            # First call initializtion, or change in signal length. Note that calling
+            # this also determines the optimal scales and initialized the filter bank.
+            self.signal_length = signal_length
+
+        # cwt shape: [n_batch,n_scales,1 or 2 (real or complex number),signal_length]
+        cwt = self._extractor(x)
+        # power shape: [n_batch,n_scales,signal_length]
+        power = torch.sum(cwt**2, dim=2)
+
+        if self.unbias:
+            scales = torch.tensor(self.scales, dtype=power.dtype, device=power.device)
+            return power / scales.view(1, -1, 1)
+        else:
+            return power
+
     @property
     def dt(self):
         return self._dt

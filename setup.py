@@ -21,6 +21,9 @@ setup(
         'examples':[
             'matplotlib>=2.0.0',
         ],
+        'tests':[
+            'pytest>=4.6.4',
+        ],
     },
     scripts=[]
 )

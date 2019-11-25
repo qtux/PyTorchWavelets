@@ -20,7 +20,6 @@ from wavelets_pytorch.transform import WaveletTransformTorch
 class Scalogram(torch.nn.Module):
     def __init__(self, seg_width, dt=0.05, dj=0.125, cuda=True):
         super(Scalogram, self).__init__()
-        self.cuda = cuda
         self.wavelet = WaveletTransformTorch(dt, dj, cuda=cuda)
         self.wavelet.signal_length = seg_width # implicitely set num_scales
 
@@ -29,19 +28,11 @@ class Scalogram(torch.nn.Module):
         return len(self.wavelet.scales)
 
     def forward(self, X):
-        # move to cpu if using cuda
-        if self.cuda:
-            X = X.cpu()
         # determine scalogram for each channel
         scalograms = []
         for channel in torch.split(X, 1, dim=1):
-            power_np = self.wavelet.power(channel.numpy())
-            power_torch = torch.tensor(power_np).float()
-            scalograms.append(power_torch)
+            scalograms.append(self.wavelet.power(channel))
         X = torch.stack(scalograms, dim=1)
-        # move back to gpu if using cuda
-        if self.cuda:
-            X = X.cuda()
         return X
 
 class ConvNet(torch.nn.Module):

@@ -34,6 +34,7 @@ dj  = 0.125
 unbias = False
 batch_size = 32
 wavelet = Morlet(w0=6)
+cuda = torch.cuda.is_available()
 
 t_min = 0
 t_max = 10
@@ -50,10 +51,11 @@ batch += np.random.normal(0, 0.2, batch.shape)  # Gaussian noise
 # Performing wavelet transform
 
 wa = WaveletTransform(dt, dj, wavelet, unbias=unbias)
-wa_torch = WaveletTransformTorch(dt, dj, wavelet, unbias=unbias, cuda=torch.cuda.is_available())
+wa_torch = WaveletTransformTorch(dt, dj, wavelet, unbias=unbias, cuda=cuda)
 
 power = wa.power(batch)
-power_torch = wa_torch.power(batch)
+batch_torch = torch.tensor(batch[:,None,:], dtype=torch.float, device='cuda' if cuda else 'cpu')
+power_torch = wa_torch.power(batch_torch).cpu()
 
 ######################################
 # Plotting
@@ -70,7 +72,7 @@ ax[1].axhline(1.0 / random_frequencies[0], lw=1, color='k')
 ax[1].set_title('Scalogram (SciPy)'.format(1.0/random_frequencies[0]))
 
 # Plot scalogram for PyTorch implementation
-plot_scalogram(power_torch[0], wa_torch.fourier_periods, t, ax=ax[2])
+plot_scalogram(power_torch[0].numpy(), wa_torch.fourier_periods, t, ax=ax[2])
 ax[2].axhline(1.0 / random_frequencies[0], lw=1, color='k')
 ax[2].set_title('Scalogram (Torch)'.format(1.0/random_frequencies[0]))
 ax[2].set_ylabel('')
