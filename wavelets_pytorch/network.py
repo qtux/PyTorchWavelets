@@ -90,7 +90,7 @@ class TorchFilterBank(nn.Module):
             padding = self._get_padding(padding_type, filt_size)
 
             conv = nn.Conv1d(1, chn_out, kernel_size=filt_size, padding=padding, bias=False)
-            conv.weight.data = torch.from_numpy(filt_weights)
+            conv.weight.data = torch.from_numpy(filt_weights).flip(-1)
             conv.weight.requires_grad_(False)
 
             if self._cuda: conv.cuda()

@@ -14,7 +14,7 @@
 
 import numpy as np
 import torch
-from wavelets_pytorch.transform import WaveletTransformTorch
+from wavelets_pytorch.transform import WaveletTransformTorch, WaveletTransform
 
 def test_torch_power_implementation():
     # create random data
@@ -29,3 +29,20 @@ def test_torch_power_implementation():
     power_torch = wt.power(X)
 
     assert np.allclose(power_np, power_torch.numpy())
+
+def test_cwt_scipy_vs_torch():
+    # create random data
+    n_samples = 100
+    signal_length = 42
+    X = np.random.rand(n_samples, signal_length)
+
+    # calculate power via the original numpy route and via the torch implementation
+    wa_scipy = WaveletTransform(dt=1.0, dj=0.125)
+    wa_torch = WaveletTransformTorch(dt=1.0, dj=0.125, cuda=False)
+
+    cwt_scipy = wa_scipy.cwt(X)
+    cwt_torch = wa_torch.cwt(X)
+
+    # ensure that the exact same scales were used
+    assert np.array_equal(wa_scipy._scales, wa_torch._scales)
+    assert np.allclose(cwt_torch, cwt_scipy, rtol=1e-5, atol=1e-6)
