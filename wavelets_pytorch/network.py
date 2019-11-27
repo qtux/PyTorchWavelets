@@ -49,16 +49,10 @@ class TorchFilterBank(nn.Module):
         :param x: torch.Variable, batch of input signals of shape [N,1,T]
         :return: torch.Variable, batch of outputs of size [N,N_scales,1/2,T]
         """
-
-        if not self._filters:
-            raise ValueError('PyTorch filters not initialized. Please call set_filters() first.')
-            return None
-        results = [None]*len(self._filters)
-        for ind, conv in enumerate(self._filters):
-            results[ind] = conv(x)
-        results = torch.stack(results)     # [n_scales,n_batch,2,t]
-        results = results.permute(1,0,2,3) # [n_batch,n_scales,2,t]
-        return results
+        assert len(self.filters) > 0, 'No filters are provided, call set_filters(...) to set them.'
+        results = [conv(x) for conv in self.filters]
+        results = torch.stack(results)   # [n_scales,n_batch,2,t]
+        return results.permute(1,0,2,3)  # [n_batch,n_scales,2,t]
 
     def set_filters(self, filters, padding_type='SAME'):
         """
@@ -73,8 +67,8 @@ class TorchFilterBank(nn.Module):
         assert isinstance(filters, list)
         assert padding_type in ['SAME', 'VALID']
 
-        self._filters = [None]*len(filters)
-        for ind, filt in enumerate(filters):
+        self.filters = torch.nn.ModuleList([])
+        for filt in filters:
 
             assert filt.dtype in (np.float32, np.float64, np.complex64, np.complex128)
 
@@ -93,8 +87,9 @@ class TorchFilterBank(nn.Module):
             conv.weight.data = torch.from_numpy(filt_weights).flip(-1)
             conv.weight.requires_grad_(False)
 
-            if self._cuda: conv.cuda()
-            self._filters[ind] = conv
+            self.filters.append(conv)
+        if self._cuda:
+            self.cuda()
 
     @staticmethod
     def _get_padding(padding_type, kernel_size):
