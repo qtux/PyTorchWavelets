@@ -247,7 +247,9 @@ class WaveletTransformTorch(WaveletTransformBase):
         """
         super(WaveletTransformTorch, self).__init__(dt, dj, wavelet, unbias)
         self._cuda = cuda
-        self._extractor = TorchFilterBank(self.filters, cuda)
+        self._extractor = TorchFilterBank(self.filters)
+        if self._cuda:
+            self._extractor = self._extractor.cuda()
 
     def cwt(self, x):
         """
@@ -332,8 +334,12 @@ class WaveletTransformTorch(WaveletTransformBase):
     def dt(self, value):
         super(WaveletTransformTorch, self.__class__).dt.fset(self, value)
         self._extractor.set_filters(self.filters)
+        if self._cuda:
+            self._extractor = self._extractor.cuda()
 
     @WaveletTransformBase.signal_length.setter
     def signal_length(self, value):
         super(WaveletTransformTorch, self.__class__).signal_length.fset(self, value)
         self._extractor.set_filters(self.filters)
+        if self._cuda:
+            self._extractor = self._extractor.cuda()

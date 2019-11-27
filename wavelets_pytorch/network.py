@@ -24,18 +24,15 @@ import torch.nn as nn
 
 class TorchFilterBank(nn.Module):
 
-    def __init__(self, filters=[], cuda=True):
+    def __init__(self, filters=[]):
         """
         Temporal filter bank in PyTorch storing a collection of nn.Conv1d filters.
-        When cuda=True, the convolutions are performed on the GPU. If initialized with
-        filters=None, the set_filters() method has to be called before actual running
-        the convolutions.
+        If initialized with filters=None, the set_filters() method has to be called
+        before actual running the convolutions.
 
         :param filters: list, collection of variable sized 1D filters (default: [])
-        :param cuda: boolean, whether to run on GPU or not (default: True)
         """
         super(TorchFilterBank, self).__init__()
-        self._cuda = cuda
         self.set_filters(filters)
 
     def forward(self, x):
@@ -88,8 +85,6 @@ class TorchFilterBank(nn.Module):
             conv.weight.requires_grad_(False)
 
             self.filters.append(conv)
-        if self._cuda:
-            self.cuda()
 
     @staticmethod
     def _get_padding(padding_type, kernel_size):
