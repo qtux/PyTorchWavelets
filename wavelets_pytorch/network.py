@@ -24,7 +24,7 @@ import torch.nn as nn
 
 class TorchFilterBank(nn.Module):
 
-    def __init__(self, filters=None, cuda=True):
+    def __init__(self, filters=[], cuda=True):
         """
         Temporal filter bank in PyTorch storing a collection of nn.Conv1d filters.
         When cuda=True, the convolutions are performed on the GPU. If initialized with
@@ -36,7 +36,7 @@ class TorchFilterBank(nn.Module):
         """
         super(TorchFilterBank, self).__init__()
         self._cuda = cuda
-        self._filters = [] if not filters else self.set_filters(filters)
+        self.set_filters(filters)
 
     def forward(self, x):
         """

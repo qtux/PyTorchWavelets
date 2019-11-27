@@ -58,9 +58,9 @@ class WaveletTransformBase(object):
         self._wavelet = wavelet
         self._unbias = unbias
         self._scale_minimum = self.compute_minimum_scale()
-        self._signal_length = None  # initialize on first call
-        self._scales  = None        # initialize on first call
-        self._filters = None        # initialize on first call
+        self._signal_length = None
+        self._scales  = []  # recalculate when setting signal_length or dt
+        self._filters = []  # recalculate when setting signal_length or dt
 
     @abstractmethod
     def cwt(self, x):
@@ -158,7 +158,7 @@ class WaveletTransformBase(object):
     @property
     def fourier_periods(self):
         """ Return the equivalent Fourier periods for the scales used. """
-        assert self._scales is not None, 'Wavelet scales are not initialized.'
+        assert len(self.scales) > 0, 'Wavelet scales are not initialized.'
         return self.fourier_period(self.scales)
 
     @property
@@ -180,6 +180,7 @@ class WaveletTransformBase(object):
 
     @property
     def complex_wavelet(self):
+        assert len(self._filters) > 0, 'Wavelet filters are not initialized.'
         return np.iscomplexobj(self._filters[0])
 
     @property
