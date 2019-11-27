@@ -54,13 +54,13 @@ class WaveletTransformBase(object):
         :param unbias: boolean, whether to unbias the power spectrum
         """
         self._dt = dt
-        self._dj = dj
-        self._wavelet = wavelet
-        self._unbias = unbias
-        self._scale_minimum = self.compute_minimum_scale()
+        self.dj = dj
+        self.wavelet = wavelet
+        self.unbias = unbias
+        self.scale_minimum = self.compute_minimum_scale()
         self._signal_length = None
-        self._scales  = []  # recalculate when setting signal_length or dt
-        self._filters = []  # recalculate when setting signal_length or dt
+        self.scales  = []  # recalculate when setting signal_length or dt
+        self.filters = []  # recalculate when setting signal_length or dt
 
     @abstractmethod
     def cwt(self, x):
@@ -73,11 +73,11 @@ class WaveletTransformBase(object):
         of the mother wavelet. Also includes normalization. Code is based on:
         https://github.com/aaren/wavelets/blob/master/wavelets/transform.py#L88
         """
-        self._scale_minimum = self.compute_minimum_scale()
-        self._scales = self.compute_optimal_scales()
+        self.scale_minimum = self.compute_minimum_scale()
+        self.scales = self.compute_optimal_scales()
 
-        self._filters = [None]*len(self.scales)
-        for scale_idx, scale in enumerate(self._scales):
+        self.filters = [None]*len(self.scales)
+        for scale_idx, scale in enumerate(self.scales):
             # Number of points needed to capture wavelet
             M = 10 * scale / self.dt
             # Times to use, centred at zero
@@ -85,7 +85,7 @@ class WaveletTransformBase(object):
             if len(t) % 2 == 0: t = t[0:-1]  # requires odd filter size
             # Sample wavelet and normalise
             norm = (self.dt / scale) ** .5
-            self._filters[scale_idx] = norm * self.wavelet(t, scale)
+            self.filters[scale_idx] = norm * self.wavelet(t, scale)
 
     def compute_optimal_scales(self):
         """
@@ -94,8 +94,8 @@ class WaveletTransformBase(object):
         """
         if self.signal_length is None:
             raise ValueError('Please specify signal_length before computing optimal scales.')
-        J = int((1 / self.dj) * np.log2(self.signal_length * self.dt / self._scale_minimum))
-        scales = self._scale_minimum * 2 ** (self.dj * np.arange(0, J + 1))
+        J = int((1 / self.dj) * np.log2(self.signal_length * self.dt / self.scale_minimum))
+        scales = self.scale_minimum * 2 ** (self.dj * np.arange(0, J + 1))
         return scales
 
     def compute_minimum_scale(self):
@@ -142,10 +142,6 @@ class WaveletTransformBase(object):
         self._build_filters()
 
     @property
-    def wavelet(self):
-        return self._wavelet
-
-    @property
     def fourier_period(self):
         """ Return a function that calculates the equivalent Fourier. """
         return getattr(self.wavelet, 'fourier_period')
@@ -167,21 +163,9 @@ class WaveletTransformBase(object):
         return np.reciprocal(self.fourier_periods)
 
     @property
-    def scales(self):
-        return self._scales
-
-    @property
-    def dj(self):
-        return self._dj
-
-    @property
-    def unbias(self):
-        return self._unbias
-
-    @property
     def complex_wavelet(self):
-        assert len(self._filters) > 0, 'Wavelet filters are not initialized.'
-        return np.iscomplexobj(self._filters[0])
+        assert len(self.filters) > 0, 'Wavelet filters are not initialized.'
+        return np.iscomplexobj(self.filters[0])
 
     @property
     def output_dtype(self):
@@ -222,7 +206,7 @@ class WaveletTransform(WaveletTransformBase):
         num_examples  = x.shape[0]
         signal_length = x.shape[-1]
 
-        if signal_length != self.signal_length or not self._filters:
+        if signal_length != self.signal_length or not self.filters:
             # First call initializtion, or change in signal length. Note that calling
             # this also determines the optimal scales and initialized the filter bank.
             self.signal_length = signal_length
@@ -240,7 +224,7 @@ class WaveletTransform(WaveletTransformBase):
     def _compute_single(self, x):
         assert x.ndim == 1, 'Input signal must have single dimension.'
         output = np.zeros((len(self.scales), len(x)), self.output_dtype)
-        for scale_idx, filt in enumerate(self._filters):
+        for scale_idx, filt in enumerate(self.filters):
             output[scale_idx,:] = scipy.signal.convolve(x, filt, mode='same')
         return output
 
@@ -263,7 +247,7 @@ class WaveletTransformTorch(WaveletTransformBase):
         """
         super(WaveletTransformTorch, self).__init__(dt, dj, wavelet, unbias)
         self._cuda = cuda
-        self._extractor = TorchFilterBank(self._filters, cuda)
+        self._extractor = TorchFilterBank(self.filters, cuda)
 
     def cwt(self, x):
         """
@@ -289,7 +273,7 @@ class WaveletTransformTorch(WaveletTransformBase):
         num_examples  = x.shape[0]
         signal_length = x.shape[-1]
 
-        if signal_length != self.signal_length or not self._filters:
+        if signal_length != self.signal_length or not self.filters:
             # First call initializtion, or change in signal length. Note that calling
             # this also determines the optimal scales and initialized the filter bank.
             self.signal_length = signal_length
@@ -328,7 +312,7 @@ class WaveletTransformTorch(WaveletTransformBase):
         :return: torch tensor, scalogram for each signal [n_batch,n_scales,signal_length]
         """
         signal_length = x.shape[-1]
-        if signal_length != self.signal_length or not self._filters:
+        if signal_length != self.signal_length or not self.filters:
             # First call initializtion, or change in signal length. Note that calling
             # this also determines the optimal scales and initialized the filter bank.
             self.signal_length = signal_length
@@ -344,20 +328,12 @@ class WaveletTransformTorch(WaveletTransformBase):
         else:
             return power
 
-    @property
-    def dt(self):
-        return self._dt
-
-    @dt.setter
+    @WaveletTransformBase.dt.setter
     def dt(self, value):
         super(WaveletTransformTorch, self.__class__).dt.fset(self, value)
-        self._extractor.set_filters(self._filters)
+        self._extractor.set_filters(self.filters)
 
-    @property
-    def signal_length(self):
-        return self._signal_length
-
-    @signal_length.setter
+    @WaveletTransformBase.signal_length.setter
     def signal_length(self, value):
         super(WaveletTransformTorch, self.__class__).signal_length.fset(self, value)
-        self._extractor.set_filters(self._filters)
+        self._extractor.set_filters(self.filters)

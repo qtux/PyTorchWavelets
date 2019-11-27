@@ -44,5 +44,5 @@ def test_cwt_scipy_vs_torch():
     cwt_torch = wa_torch.cwt(X)
 
     # ensure that the exact same scales were used
-    assert np.array_equal(wa_scipy._scales, wa_torch._scales)
+    assert np.array_equal(wa_scipy.scales, wa_torch.scales)
     assert np.allclose(cwt_torch, cwt_scipy, rtol=1e-5, atol=1e-6)
