@@ -24,7 +24,7 @@ import torch.nn as nn
 
 class TorchFilterBank(nn.Module):
 
-    def __init__(self, filters=[]):
+    def __init__(self, filters=[], channels=1):
         """
         Temporal filter bank in PyTorch storing a collection of nn.Conv1d filters.
         If initialized with filters=None, the set_filters() method has to be called
@@ -34,6 +34,7 @@ class TorchFilterBank(nn.Module):
         """
         super(TorchFilterBank, self).__init__()
         self.set_filters(filters)
+        self.channels = channels
 
     def forward(self, x):
         """
@@ -47,9 +48,14 @@ class TorchFilterBank(nn.Module):
         :return: torch.Variable, batch of outputs of size [N,N_scales,1/2,T]
         """
         assert len(self.filters) > 0, 'No filters are provided, call set_filters(...) to set them.'
-        results = [conv(x) for conv in self.filters]
-        results = torch.stack(results)   # [n_scales,n_batch,2,t]
-        return results.permute(1,0,2,3)  # [n_batch,n_scales,2,t]
+        results = []
+        for conv in self.filters:
+            res = conv(x)                                                    # [n_batch,chn_out*2,t]
+            res = res.reshape(res.shape[0], -1, self.num_dim, res.shape[2])  # [n_batch,chn_out,2,t]
+            results.append(res)
+        results = torch.stack(results)        # [n_scales,n_batch,chn_out,2,t]
+        results = results.permute(1,2,0,3,4)  # [n_batch,chn_out,n_scales,2,t]
+        return results
 
     def set_filters(self, filters, padding_type='SAME'):
         """
@@ -70,17 +76,25 @@ class TorchFilterBank(nn.Module):
             assert filt.dtype in (np.float32, np.float64, np.complex64, np.complex128)
 
             if np.iscomplex(filt).any():
-                chn_out = 2
+                self.num_dim = 2
                 filt_weights = np.asarray([np.real(filt), np.imag(filt)], np.float32)
             else:
-                chn_out = 1
+                self.num_dim = 1
                 filt_weights = filt.astype(np.float32)[None,:]
 
             filt_weights = np.expand_dims(filt_weights, 1)  # append chn_in dimension
+            filt_weights = np.concatenate([filt_weights] * self.channels, axis=0)
             filt_size = filt_weights.shape[-1]              # filter length
-            padding = self._get_padding(padding_type, filt_size)
 
-            conv = nn.Conv1d(1, chn_out, kernel_size=filt_size, padding=padding, bias=False)
+            # define Conv1d and assign the filter weights (flipped to account for cross-correlation)
+            conv = nn.Conv1d(
+                in_channels=self.channels,
+                out_channels=self.channels * self.num_dim,
+                kernel_size=filt_size,
+                padding=self._get_padding(padding_type, filt_size),
+                bias=False,
+                groups=self.channels
+            )
             conv.weight.data = torch.from_numpy(filt_weights).flip(-1)
             conv.weight.requires_grad_(False)
 

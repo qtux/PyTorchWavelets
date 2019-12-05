@@ -17,30 +17,12 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 from wavelets_pytorch.transform import WaveletTransformTorch
 
-class Scalogram(torch.nn.Module):
-    def __init__(self, seg_width, dt=0.05, dj=0.125, cuda=True):
-        super(Scalogram, self).__init__()
-        self.wavelet = WaveletTransformTorch(dt, dj, cuda=cuda)
-        self.wavelet.signal_length = seg_width # implicitely set num_scales
-
-    @property
-    def num_scales(self):
-        return len(self.wavelet.scales)
-
-    def forward(self, X):
-        # determine scalogram for each channel
-        scalograms = []
-        for channel in torch.split(X, 1, dim=1):
-            scalograms.append(self.wavelet.power(channel))
-        X = torch.stack(scalograms, dim=1)
-        return X
-
 class ConvNet(torch.nn.Module):
     def __init__(self, channels, segment_width, conv_filters=64, kernel_size=3):
         super(ConvNet, self).__init__()
-        scalogram = Scalogram(segment_width, cuda=torch.cuda.is_available())
+        self.scalogram = WaveletTransformTorch(dt=0.05, dj=0.125, cuda=torch.cuda.is_available(), channels=channels)
+        self.scalogram.signal_length = segment_width # implicitely set scales
         self.sequence = torch.nn.Sequential(
-            scalogram,
             torch.nn.ConstantPad2d((kernel_size - 1, 0, kernel_size - 1, 0), 0),
             torch.nn.Conv2d(
                 in_channels=channels,
@@ -50,12 +32,13 @@ class ConvNet(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Flatten(),
             torch.nn.Linear(
-                in_features=conv_filters * scalogram.num_scales * segment_width,
+                in_features=conv_filters * len(self.scalogram.scales) * segment_width,
                 out_features=1
             ),
         )
 
     def forward(self, X):
+        X = self.scalogram.power(X)
         return self.sequence(X).reshape(-1)
 
 def main(n_samples=1000, n_channels=42, segment_width=20):

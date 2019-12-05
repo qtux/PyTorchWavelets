@@ -232,7 +232,7 @@ class WaveletTransform(WaveletTransformBase):
 
 class WaveletTransformTorch(WaveletTransformBase):
 
-    def __init__(self, dt=1.0, dj=0.125, wavelet=Morlet(), unbias=False, cuda=True):
+    def __init__(self, dt=1.0, dj=0.125, wavelet=Morlet(), unbias=False, cuda=True, channels=1):
         """
         This is PyTorch version of the CWT filter bank. Main work for this filter bank
         is performed by the convolution implementated in 'torch.nn.Conv1d'. Actual
@@ -247,7 +247,7 @@ class WaveletTransformTorch(WaveletTransformBase):
         """
         super(WaveletTransformTorch, self).__init__(dt, dj, wavelet, unbias)
         self._cuda = cuda
-        self._extractor = TorchFilterBank(self.filters)
+        self._extractor = TorchFilterBank(self.filters, channels=channels)
         if self._cuda:
             self._extractor = self._extractor.cuda()
 
@@ -272,7 +272,6 @@ class WaveletTransformTorch(WaveletTransformBase):
             # [n_batch,signal_length] => [n_batch,1,signal_length]
             x = x[:,None,:]
 
-        num_examples  = x.shape[0]
         signal_length = x.shape[-1]
 
         if signal_length != self.signal_length or not self.filters:
@@ -293,17 +292,22 @@ class WaveletTransformTorch(WaveletTransformBase):
         cwt = cwt.numpy()
 
         if self.complex_wavelet:
+            # cwt shape: [n_batch,chn_out,n_scales,2,signal_length]
             # Combine real and imag parts, returns object of shape
-            # [n_batch,n_scales,signal_length] of type np.complex128
-            cwt = (cwt[:,:,0,:] + cwt[:,:,1,:]*1j).astype(self.output_dtype)
+            # [n_batch,chn_out,n_scales,signal_length] of type np.complex128
+            cwt = (cwt[:,:,:,0,:] + cwt[:,:,:,1,:]*1j).astype(self.output_dtype)
         else:
-            # Just squeeze the chn_out dimension (=1) to obtain an object of shape
-            # [n_batch,n_scales,signal_length] of type np.float64
-            cwt = np.squeeze(cwt, 2).astype(self.output_dtype)
+            # cwt shape: [n_batch,chn_out,n_scales,1,signal_length]
+            # Just squeeze the num_dim dimension (=1) to obtain an object of shape
+            # [n_batch,n_scales,chn_out,signal_length] of type np.float64
+            cwt = np.squeeze(cwt, 3).astype(self.output_dtype)
 
         # Squeeze batch dimension if single example
-        if num_examples == 1:
+        if cwt.shape[0] == 1:
             cwt = cwt.squeeze(0)
+        # Squeeze the chn_out dimension if single dimension (to be compatible with SciPy)
+        if cwt.shape[1] == 1:
+            cwt = np.squeeze(cwt, 1)
         return cwt
 
     def power(self, x):
@@ -319,10 +323,10 @@ class WaveletTransformTorch(WaveletTransformBase):
             # this also determines the optimal scales and initialized the filter bank.
             self.signal_length = signal_length
 
-        # cwt shape: [n_batch,n_scales,1 or 2 (real or complex number),signal_length]
+        # cwt shape: [n_batch,chn_out,n_scales,1 or 2 (real or complex number),signal_length]
         cwt = self._extractor(x)
-        # power shape: [n_batch,n_scales,signal_length]
-        power = torch.sum(cwt**2, dim=2)
+        # Squeeze the chn_out dimension if single dimension (to be compatible with SciPy)
+        power = torch.sum(cwt**2, dim=3).squeeze(dim=1)
 
         if self.unbias:
             scales = torch.tensor(self.scales, dtype=power.dtype, device=power.device)
